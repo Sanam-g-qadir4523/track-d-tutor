@@ -7,6 +7,8 @@ Course Companion turns lecture slides and lecture videos into one knowledge base
 Demo course: **MIT 6.036 Introduction to Machine Learning (Fall 2020), Lectures 1 to 5.**
 The course material belongs to MIT and Prof. Tamara Broderick. It is not stored in this repository (see "Rebuilding the knowledge base").
 
+A recorded walkthrough of the running system is linked in the Devpost submission, because the app runs on a local machine and cannot be opened from this page.
+
 ## What it does
 
 | Area | What is built |
@@ -101,5 +103,5 @@ The course material is not included in this repository. To rebuild it:
 1. Download the five slide PDFs from Prof. Broderick's 6.036 Fall 2020 page (https://tamarabroderick.com/ml.html) into `data/` as `slides_01.pdf` to `slides_05.pdf`.
 2. Run `python ingest.py` (fetches the five video transcripts automatically, builds `data/chunks.json`).
 3. Run `python embed_local.py` (builds `data/embeddings.npy`).
-4. Start the backend with `uvicorn server:app --port 8000` and the interface with `cd frontend && npm run dev`, then open http://127.0.0.1:5173. On Windows, `start.bat` does both.
+4. Start the backend with `uvicorn server:app --port 8000` and, in a second terminal, the interface with `cd frontend && npm run dev`. Then open http://127.0.0.1:5173 in a browser. This address only works on the computer where the app is running, so it will not open from GitHub. On Windows, `start.bat` starts both and opens the page.
 5. Optional: `python eval.py` reproduces the evaluation table.
