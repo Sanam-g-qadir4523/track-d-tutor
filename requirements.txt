@@ -1,0 +1,10 @@
+google-genai
+pymupdf
+youtube-transcript-api
+python-dotenv
+fastembed
+numpy
+scikit-learn
+fastapi
+uvicorn
+pypdf
