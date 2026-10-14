@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Post-quiz report - Course Companion</title>
+<style>
+  :root { --bg:#0b1020; --card:#131a30; --line:#26304f; --text:#e8ecf8; --muted:#9aa6c8;
+          --accent:#ffd84d; --weak:#ff6b7a; --ok:#ffd84d; --strong:#4ade80; }
+  @media (prefers-color-scheme: light) {
+    :root { --bg:#f6f7fb; --card:#ffffff; --line:#dfe3f0; --text:#161b2e; --muted:#5a6483;
+            --accent:#b88a00; --weak:#d6293e; --ok:#b88a00; --strong:#16a34a; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:16px/1.55 system-ui, Segoe UI, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 28px 18px 60px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  h2 { font-size: 19px; margin: 30px 0 10px; }
+  .muted { color: var(--muted); font-size: 14px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px 18px; margin:12px 0; }
+  .row { display:flex; align-items:center; gap:12px; margin:8px 0; }
+  .name { width: 170px; flex:none; }
+  .bar { flex:1; height:10px; background:var(--line); border-radius:6px; overflow:hidden; }
+  .fill { height:100%; border-radius:6px; }
+  .tag { font-size:12px; padding:2px 8px; border-radius:20px; border:1px solid currentColor; white-space:nowrap; }
+  .weak { color:var(--weak); } .ok { color:var(--ok); } .strong { color:var(--strong); } .none { color:var(--muted); }
+  .mis { border-left:4px solid var(--accent); padding:8px 12px; margin:10px 0; background:rgba(255,216,77,.08); border-radius:6px; }
+  .wrong { border-top:1px solid var(--line); padding-top:10px; margin-top:10px; }
+  .bad { color:var(--weak); } .good { color:var(--strong); }
+  a { color: var(--accent); }
+  button { background:var(--accent); color:#111; border:0; border-radius:8px; padding:8px 14px; font-weight:600; cursor:pointer; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Post-quiz report</h1>
+  <div class="muted" id="sub">Loading...</div>
+  <div id="out"></div>
+</main>
+<script>
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
+const LABEL = { "weak":"Weak", "ok":"Getting there", "strong":"Strong", "not tested":"Not tested" };
+const CLS = { "weak":"weak", "ok":"ok", "strong":"strong", "not tested":"none" };
+const COLOR = { "weak":"var(--weak)", "ok":"var(--ok)", "strong":"var(--strong)", "not tested":"var(--line)" };
+
+async function load(refresh) {
+  const out = document.getElementById("out"); out.textContent = "";
+  document.getElementById("sub").textContent = "Loading...";
+  let d;
+  try { d = await (await fetch("/api/report" + (refresh ? "?refresh=true" : ""))).json(); }
+  catch (e) { document.getElementById("sub").textContent = "Could not reach the tutor server (port 8000)."; return; }
+  if (!d.total_answers) {
+    document.getElementById("sub").textContent = "No answers yet.";
+    out.appendChild(el("div", "card", "Answer a few questions on the Practice screen first, then come back to this report."));
+    return;
+  }
+  document.getElementById("sub").textContent = d.overall_correct + " of " + d.total_answers + " answers correct. Mastery is a Bayesian knowledge tracing estimate per topic.";
+
+  out.appendChild(el("h2", "", "Mastery by topic"));
+  const box = el("div", "card");
+  d.topics.forEach(t => {
+    const r = el("div", "row");
+    r.appendChild(el("div", "name", t.topic));
+    const bar = el("div", "bar"); const f = el("div", "fill");
+    f.style.width = Math.round((t.mastery || 0) * 100) + "%"; f.style.background = COLOR[t.status]; bar.appendChild(f);
+    r.appendChild(bar);
+    r.appendChild(el("div", "tag " + CLS[t.status], LABEL[t.status] + (t.asked ? " (" + t.right + "/" + t.asked + ")" : "")));
+    box.appendChild(r);
+  });
+  out.appendChild(box);
+
+  out.appendChild(el("h2", "", "Topics to revise first"));
+  if (!d.weak.length) out.appendChild(el("div", "card", "No weak topics yet. Keep practising."));
+  d.weak.forEach(w => {
+    const c = el("div", "card");
+    const head = el("div", "row");
+    head.appendChild(el("strong", "", w.topic));
+    head.appendChild(el("span", "tag " + CLS[w.status], LABEL[w.status] + ", mastery " + w.mastery));
+    c.appendChild(head);
+    if (w.likely_misconception) {
+      const m = el("div", "mis");
+      m.appendChild(el("strong", "", "Likely misconception: "));
+      m.appendChild(document.createTextNode(w.likely_misconception));
+      c.appendChild(m);
+    }
+    w.wrong.forEach(x => {
+      const b = el("div", "wrong");
+      b.appendChild(el("div", "", x.question || "(question text not saved for this older answer)"));
+      if (x.chosen) { const p = el("div", "bad"); p.textContent = "You chose: " + x.chosen; b.appendChild(p); }
+      if (x.correct_answer) { const p = el("div", "good"); p.textContent = "Correct answer: " + x.correct_answer; b.appendChild(p); }
+      if (x.explanation) b.appendChild(el("div", "muted", x.explanation));
+      const a = el("a", "", "Source: " + x.source); a.href = x.url; a.target = "_blank"; b.appendChild(a);
+      c.appendChild(b);
+    });
+    const rv = el("a", "", "Open this lecture's slides"); rv.href = w.review_url; rv.target = "_blank";
+    const p = el("div", "wrong"); p.appendChild(rv); c.appendChild(p);
+    out.appendChild(c);
+  });
+
+  out.appendChild(el("p", "muted", d.note));
+  const btn = el("button", "", "Refresh misconception analysis"); btn.onclick = () => load(true);
+  out.appendChild(btn);
+}
+load(false);
+</script>
+</body>
+</html>

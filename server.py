@@ -199,9 +199,9 @@ def chat(body: ChatIn):
     hits = search(question)
     best = round(hits[0][1], 2)
     if hits[0][1] < MIN_SCORE:
-        return {"answer": REFUSAL[lang], "refused": True, "best_score": best, "sources": []}
+        return {"answer": REFUSAL[lang], "refused": True, "best_score": best, "reason": "low_score", "sources": []}
     context = "\n\n".join(
-        f"[{i}] ({c['source']})\n{c['text'][:1500]}" for i, (c, s) in enumerate(hits, 1)
+        f"[{i}] ({c['source']})\n{c['text'][:2200]}" for i, (c, s) in enumerate(hits, 1)
     )
     language_rule = (
         "Write the explanation in Urdu (Urdu script). Keep technical terms such as "
@@ -211,7 +211,7 @@ def chat(body: ChatIn):
     prompt = f"""You are a tutor. Answer ONLY using the numbered excerpts below.
 Explain clearly in 3-6 sentences. {language_rule}
 After each claim, put the excerpt number in square brackets, like [1].
-If the excerpts do not contain the answer, reply exactly: NOT_IN_MATERIAL
+Use what the excerpts say, even if they cover only part of the question or describe the idea in different words (for example, the normal vector of a hyperplane describes the decision boundary of a perceptron). If they only partly answer it, answer the supported part and add one sentence saying what the excerpts do not cover. Reply exactly NOT_IN_MATERIAL only if the excerpts contain nothing relevant to the question.
 Do not use outside knowledge.
 
 Excerpts:
@@ -224,7 +224,7 @@ Question: {question}"""
         raise HTTPException(502, "AI service error (maybe quota): " + str(e)[:150])
     answer = (r.text or "").strip()
     if "NOT_IN_MATERIAL" in answer:
-        return {"answer": REFUSAL[lang], "refused": True, "best_score": best, "sources": []}
+        return {"answer": REFUSAL[lang], "refused": True, "best_score": best, "reason": "model_declined", "sources": []}
     sources = [{"n": i, "label": c["source"], "type": c["type"],
                 "score": round(s, 2), "url": link(c)}
                for i, (c, s) in enumerate(hits, 1)]
@@ -264,6 +264,9 @@ def quiz_answer(body: AnswerIn):
     answers.append({
         "lecture": c["lecture"], "topic": topic, "difficulty": p["difficulty"],
         "correct": is_right, "source": c["source"],
+        "question": p["question"],
+        "chosen": p["options"][body.choice] if 0 <= body.choice < len(p["options"]) else None,
+        "correct_text": p["options"][p["correct"]], "explanation": p["explanation"], "url": link(c),
         "time": time.strftime("%Y-%m-%d %H:%M:%S"),
     })
     save(HISTORY, history)
@@ -291,6 +294,81 @@ def mastery_api():
         topics.append({"topic": t, "asked": asked, "right": rights.get(t, 0),
                        "mastery": score, "status": status})
     return {"topics": topics, "recent": answers[-10:][::-1], "total_answers": len(answers)}
+
+
+REPORT_CACHE = {"n": -1, "mis": {}}
+
+
+def _wrong_for(topic, limit=5):
+    out = []
+    for a in reversed(answers):
+        if a["topic"] == topic and not a["correct"]:
+            out.append({
+                "question": a.get("question"), "chosen": a.get("chosen"),
+                "correct_answer": a.get("correct_text"), "explanation": a.get("explanation"),
+                "source": a["source"], "url": a.get("url") or f"{BASE}/slides/{a['lecture']}",
+            })
+        if len(out) >= limit:
+            break
+    return out
+
+
+@app.get("/api/report")
+def report_api(refresh: bool = False):
+    m, counts, rights = state()
+    topics = []
+    for n, t in TOPICS.items():
+        asked = counts.get(t, 0)
+        score = round(m[t], 2) if t in m else None
+        if asked == 0:
+            status = "not tested"
+        elif score < 0.40:
+            status = "weak"
+        elif score < 0.75:
+            status = "ok"
+        else:
+            status = "strong"
+        topics.append({"topic": t, "lecture": n, "asked": asked, "right": rights.get(t, 0),
+                       "mastery": score, "status": status})
+    weak = sorted([x for x in topics if x["status"] in ("weak", "ok")], key=lambda x: x["mastery"])
+    for w in weak:
+        w["wrong"] = _wrong_for(w["topic"])
+        w["review_url"] = f"{BASE}/slides/{w['lecture']}"
+    # Likely misconceptions: one model call, reused until a new answer arrives.
+    need = [w for w in weak if any(x.get("chosen") for x in w["wrong"])]
+    if need and (refresh or REPORT_CACHE["n"] != len(answers)):
+        lines = []
+        for w in need:
+            lines.append("TOPIC: " + w["topic"])
+            for x in w["wrong"]:
+                if x.get("chosen"):
+                    lines.append(f"- Question: {x['question']} | Student chose: {x['chosen']} | "
+                                 f"Correct: {x['correct_answer']}")
+        prompt = (
+            "A student answered practice questions from a machine learning course. For each topic below the "
+            "student's WRONG answers are listed. For each topic write ONE likely misconception in at most "
+            "2 sentences, based only on these wrong answers, and word it as a likely cause (not a certainty). "
+            "If there is not enough information, use an empty string. "
+            "Return a JSON object that maps each topic name to its string.\n\n" + "\n".join(lines)
+        )
+        try:
+            REPORT_CACHE["mis"] = call_json(prompt)
+            REPORT_CACHE["n"] = len(answers)
+        except Exception as e:
+            print("report error:", str(e)[:150])
+    mis = REPORT_CACHE["mis"] if isinstance(REPORT_CACHE["mis"], dict) else {}
+    for w in weak:
+        v = mis.get(w["topic"])
+        w["likely_misconception"] = v if isinstance(v, str) and v.strip() else None
+    return {"total_answers": len(answers), "overall_correct": sum(1 for a in answers if a["correct"]),
+            "topics": topics, "weak": weak,
+            "note": "Misconceptions are inferred by the language model from the wrong answers, so they are "
+                    "marked likely. Mastery numbers come from hand-set tracing parameters."}
+
+
+@app.get("/report")
+def report_page():
+    return FileResponse("report.html", media_type="text/html")
 
 
 @app.get("/slides/{lecture}")
