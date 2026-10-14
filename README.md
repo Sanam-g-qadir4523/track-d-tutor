@@ -118,5 +118,5 @@ The course material is not included in this repository. To rebuild it:
 1. Download the five slide PDFs from Prof. Broderick's 6.036 Fall 2020 page (https://tamarabroderick.com/ml.html) into `data/` as `slides_01.pdf` to `slides_05.pdf`.
 2. Run `python ingest.py` (fetches the five video transcripts automatically, builds `data/chunks.json`).
 3. Run `python embed_local.py` (builds `data/embeddings.npy`).
-4. Start the backend with `uvicorn server:app --port 8000` and, in a second terminal, the interface with `cd frontend && npm run dev`. Then open http://127.0.0.1:5173 in a browser. This address only works on the computer where the app is running, so it will not open from GitHub. On Windows, `start.bat` starts both and opens the page.
+4. Start the backend with `uvicorn server:app --port 8000` and, in a second terminal, the interface with `cd frontend && npm run dev`. Then type `127.0.0.1:5173` into a browser address bar. This address only works on the computer where the app is running, so it is deliberately not a clickable link and will not open from GitHub. On Windows, `start.bat` starts both and opens the page.
 5. Optional: `python eval.py` reproduces the evaluation table.
