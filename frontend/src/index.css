@@ -311,3 +311,34 @@ a.mark:hover { background: var(--marker-deep); }
   .lec-row { flex-wrap: wrap; }
   .theme-btn { margin-top: 0; }
 }
+
+/* v5: phone layout */
+html, body { overflow-x: clip; }
+@media (max-width: 860px) {
+  .shell { grid-template-columns: minmax(0, 1fr); }
+  .side { position: sticky; top: 0; z-index: 30; height: auto; overflow: visible; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; }
+  .brand { flex: 1; min-width: 0; }
+  .brand h1 { font-size: 16px; }
+  .brand p, .spine { display: none; }
+  .theme-btn { order: 2; margin: 0; padding: 8px 10px; }
+  .theme-btn span { display: none; }
+  .conn { order: 3; font-size: 0; margin: 0; padding: 0 4px; }
+  .menu { order: 5; flex: 0 0 100%; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+  .menu button { flex-direction: column; gap: 4px; padding: 8px 2px; font-size: 12.5px; text-align: center; justify-content: center; }
+  .page-head h2 { font-size: 28px; }
+  .page { padding-top: 24px; padding-bottom: 50px; }
+  .thread { padding-top: 24px; }
+  .lec-actions { width: 100%; }
+  .composer { padding-bottom: 12px; }
+}
+@media (max-width: 480px) {
+  .qcard { padding: 16px; }
+  .hero-sub { font-size: 16px; }
+  .qtext { font-size: 19px; }
+  .stat strong { font-size: 28px; }
+  .recent-row { flex-wrap: wrap; }
+}
+
+@media (max-width: 860px) {
+  .chat { min-height: calc(100svh - 125px); }
+}

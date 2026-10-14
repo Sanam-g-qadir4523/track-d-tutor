@@ -71,10 +71,25 @@ Threshold sweep (in-course allowed / off-topic refused): 0.30 gave 100% / 0%, 0.
 - The test set is small and was written after seeing the system's behaviour, and the threshold was chosen on the same questions. The 100% figures are development-set results and will not hold exactly on new questions.
 - Passage matching uses a lecture number plus one keyword, so it can miss a correct passage that words the idea differently.
 
+## Personalization check with simulated students
+
+`sim.py` simulates 300 students for each of three profiles (beginner, mixed, advanced), 30 questions each across 5 sessions. It compares the quiz's adaptive rule (untested topics first, then lowest estimated mastery) with picking a random topic. It does not use real questions or the language model. Students answer with a probability set by their true knowledge and learn a little after each question; **both the learning rate (0.08 per question) and the student profiles are assumptions**, not measurements.
+
+| Profile | Policy | Mean knowledge gain | Gain on weakest topic | Mastery tracking error |
+|---|---|---|---|---|
+| Beginner | adaptive | 0.300 | 0.359 | 0.345 |
+| Beginner | random | 0.308 | 0.353 | 0.261 |
+| Mixed | adaptive | 0.215 | 0.352 | 0.260 |
+| Mixed | random | 0.209 | 0.295 | 0.232 |
+| Advanced | adaptive | 0.135 | 0.195 | 0.189 |
+| Advanced | random | 0.136 | 0.185 | 0.189 |
+
+**Reading the result honestly:** the adaptive rule did not raise overall knowledge gain in this simulation; the two policies are within noise on that measure. Its clearest benefit is on the topic a student starts weakest in, for mixed students (0.352 against 0.295). For beginner and mixed students the mastery estimate tracked true knowledge less closely under the adaptive rule than under random choice, which points at the hand-set tracing parameters. This is a check of the selection rule in a toy setting, not evidence that real students learn faster. Question repetition is 0 here by construction (each question comes from a different source passage). Repetition of near-identical wording was not measured.
+
 ## Known limitations
 
 - **No formal answer-quality metrics yet.** Faithfulness, answer relevancy and context recall were not measured with RAGAS or a similar framework. Only retrieval and refusal were measured.
-- **Personalization is not yet evaluated** with simulated students, and the question repetition rate has not been measured. The repetition check itself (embedding similarity above 0.88 is rejected) is implemented.
+- **Personalization has only been checked in a toy simulation** (see above), not with real students, and the rate of near-duplicate questions has not been measured. The duplicate check itself (embedding similarity above 0.88 is rejected) is implemented.
 - **Slide formulas and diagrams.** Text extraction turns many formulas into broken symbols, and figures are not read, so the requirement to use information from images and diagrams is not met.
 - **No textbook** was ingested. Only slides and videos.
 - Quiz answer keys are checked by the same model that wrote the question, which catches some errors but not all. Some answer options are awkwardly worded.
